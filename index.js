@@ -1,5 +1,6 @@
 var resource = require('resource'),
     logger = resource.logger,
+    http = resource.use('http'),
     auth = resource.use('auth'),
     browserid = resource.define('auth-browserid');
 
@@ -83,8 +84,7 @@ browserid.method('strategy', strategy, {
   description: 'return BrowserID strategy'
 });
 
-function routes(app) {
-  logger.info(app);
+function routes() {
   var authOrAuthz = function(req, res, next) {
     if (!req.isAuthenticated) {
       auth.authenticate('browserid', { failureRedirect: '/login' })(req, res, next);
@@ -92,15 +92,10 @@ function routes(app) {
       auth.authorize('browserid')(req, res, next);
     }
   };
-  app.post('/auth/browserid', authOrAuthz);
+  http.app.post('/auth/browserid', authOrAuthz);
 }
 browserid.method('routes', routes, {
-  description: 'sets routes for browserid in app',
-  properties: {
-    app: {
-      type: 'object'
-    }
-  }
+  description: 'sets routes for browserid in app'
 });
 
 browserid.dependencies = {
