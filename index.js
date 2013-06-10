@@ -38,6 +38,7 @@ function strategy(callback) {
               auth.create({browserid: _browserid.id}, function(err, _auth) {
                 if (err) { throw err; }
                 logger.info("new user with id", _auth.id, "created");
+                logger.info("new user object", JSON.stringify(_auth));
                 done(null, _auth);
               });
             });
@@ -45,10 +46,16 @@ function strategy(callback) {
             throw "multiple browserids with same email!";
           } else {
             logger.info("email found, using associated browserid");
-            auth.find({browserid: browserids[0].id}, function(err, _auth) {
-              if (err) { throw err; }
-              done(null, _auth);
+            logger.info("browserid objects found", JSON.stringify(browserids));
+            // hack
+            auth.all(function(err, _auths) {
+              logger.info("all user objects", JSON.stringify(_auths));
+              done(null, _auths[0]);
             });
+            //auth.find({browserid: browserids[0].id}, function(err, _auth) {
+            //  if (err) { throw err; }
+            //  done(null, _auth);
+            //});
           }
         });
       } else {
@@ -86,8 +93,11 @@ browserid.method('strategy', strategy, {
 
 function routes() {
   var authOrAuthz = function(req, res, next) {
-    if (!req.isAuthenticated) {
-      auth.authenticate('browserid', { failureRedirect: '/login' })(req, res, next);
+    if (!req.isAuthenticated()) {
+      auth.authenticate('browserid', {
+        successRedirect: '/', 
+        failureRedirect: '/login'
+      })(req, res, next);
     } else {
       auth.authorize('browserid')(req, res, next);
     }
