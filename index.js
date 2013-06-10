@@ -93,6 +93,12 @@ function routes() {
     }
   };
   http.app.post('/auth/browserid', authOrAuthz);
+  http.app.get('/test', function(req, res) {
+    var body = 'Hello World';
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Length', body.length);
+    res.end(body);
+  });
 }
 browserid.method('routes', routes, {
   description: 'sets routes for browserid in app'
