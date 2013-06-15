@@ -8,6 +8,21 @@ browserid.schema.description = "for integrating BrowserID authentication";
 
 browserid.persist('memory');
 
+// .start() convention
+function start(options, callback) {
+  // setup .view convention
+  var view = resource.use('view');
+  view.create({ path: __dirname + '/view' }, function(err, _view) {
+      if (err) { return callback(err); }
+      browserid.view = _view;
+      return callback(null);
+  });
+}
+browserid.method('start', start, {
+  description: "starts browserid"
+});
+
+// TODO make this property be the id
 browserid.property('email', {
   description: 'email of browserid auth'
 });
@@ -91,24 +106,19 @@ browserid.method('strategy', strategy, {
   description: 'return BrowserID strategy'
 });
 
-function routes() {
+function routes(options, callback) {
   var authOrAuthz = function(req, res, next) {
     if (!req.isAuthenticated()) {
       auth.authenticate('browserid', {
         successRedirect: '/', 
-        failureRedirect: '/login'
+        failureRedirect: '/'
       })(req, res, next);
     } else {
       auth.authorize('browserid')(req, res, next);
     }
   };
   http.app.post('/auth/browserid', authOrAuthz);
-  http.app.get('/test', function(req, res) {
-    var body = 'Hello World';
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Length', body.length);
-    res.end(body);
-  });
+  callback(null);
 }
 browserid.method('routes', routes, {
   description: 'sets routes for browserid in app'
