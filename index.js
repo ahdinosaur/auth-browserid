@@ -23,7 +23,7 @@ browserid.method('start', start, {
 });
 
 // TODO make this property be the id
-browserid.property('email', {
+browserid.property('id', {
   description: 'email of browserid auth'
 });
 
@@ -42,54 +42,50 @@ function strategy(callback) {
     process.nextTick(function () {
       if (!req.user) {
         logger.info('user is not logged in, authorizing with browserid');
-        browserid.find({email: email}, function(err, browserids) {
-          if (err) { throw err; }
-          if (browserids.length === 0) {
+        browserid.get(email, function(err, _browserid) {
+          if (err && (err.message === email + " not found")) {
             logger.info("email not found. creating new browserid");
-            browserid.create({email: email}, function(err, _browserid) {
-              if (err) { throw err; }
+            browserid.create({id: email}, function(err, _browserid) {
+              if (err) { return callback(err); }
               logger.info("new browserid with id", _browserid.id, "created");
               logger.info("since new browserid, creating new user");
               auth.create({browserid: _browserid.id}, function(err, _auth) {
-                if (err) { throw err; }
+                if (err) { return callback(err); }
                 logger.info("new user with id", _auth.id, "created");
                 logger.info("new user object", JSON.stringify(_auth));
-                done(null, _auth);
+                return done(null, _auth);
               });
             });
-          } else if (browserids.length > 1) {
-            throw "multiple browserids with same email!";
+          } else if (err) {
+            return callback(err);
           } else {
             logger.info("email found, using associated browserid");
             logger.info("browserid objects found", JSON.stringify(browserids));
-            // hack
-            auth.all(function(err, _auths) {
-              logger.info("all user objects", JSON.stringify(_auths));
-              done(null, _auths[0]);
+            auth.find({browserid: _browserid.id}, function(err, _auths) {
+              if (err) { return callback(err); }
+              if (_auths.length > 1) {
+                // TODO merge multiple users with same browserid into one
+                return done(null, _auth[0]);
+              }
             });
-            //auth.find({browserid: browserids[0].id}, function(err, _auth) {
-            //  if (err) { throw err; }
-            //  done(null, _auth);
-            //});
           }
         });
       } else {
         logger.info('user is logged in, associating browserid with user');
         var user = req.user;
-        browserid.find({email: email}, function(err, browserids) {
-          if (err) { throw err; }
-          if (browserids.length === 0) {
+        browserid.get(email, function(err, _browserid) {
+          if (err && (err.message === email + " not found")) {
             logger.info("email not found. creating new browserid");
             browserid.create({email: email}, function(err, _browserid) {
               logger.info("new browserid with id", _browserid.id, "created");
-              if (err) { throw err; }
+              if (err) { return callback(err); }
               // associate new browserid with user
               user['browserid'] = _browserid.id;
               // preserve the login state by returning the existing user
               done(null, user);
             });
-          } else if (browserids.length > 1) {
-            throw "multiple browserids with same email!";
+          } else if (err) {
+            return callback(err);
           } else {
             logger.info("email found. using existing browserid");
             // associate new browserid with user
@@ -110,7 +106,7 @@ function routes(options, callback) {
   var authOrAuthz = function(req, res, next) {
     if (!req.isAuthenticated()) {
       auth.authenticate('browserid', {
-        successRedirect: '/', 
+        successRedirect: '/',
         failureRedirect: '/'
       })(req, res, next);
     } else {
