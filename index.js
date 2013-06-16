@@ -22,7 +22,6 @@ browserid.method('start', start, {
   description: "starts browserid"
 });
 
-// TODO make this property be the id
 browserid.property('id', {
   description: 'email of browserid auth'
 });
