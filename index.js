@@ -63,6 +63,7 @@ function strategy(callback) {
     // asynchronous verification, for effect...
     process.nextTick(function () {
       if (!req.user) {
+        var user = resource.use('user');
         logger.info('user is not logged in, authorizing with browserid');
         browserid.get(email, function(err, _browserid) {
           if (err && (err.message === email + " not found")) {
@@ -71,7 +72,7 @@ function strategy(callback) {
               if (err) { return callback(err); }
               logger.info("new browserid with id", _browserid.id, "created");
               logger.info("since new browserid, creating new user");
-              auth.create({browserid: _browserid.id}, function(err, _auth) {
+              user.create({browserid: _browserid.id}, function(err, _auth) {
                 if (err) { return callback(err); }
                 logger.info("new user with id", _auth.id, "created");
                 logger.info("new user object", JSON.stringify(_auth));
@@ -83,7 +84,7 @@ function strategy(callback) {
           } else {
             logger.info("email found, using associated browserid");
             logger.info("browserid objects found", JSON.stringify(browserids));
-            auth.find({browserid: _browserid.id}, function(err, _auths) {
+            user.find({browserid: _browserid.id}, function(err, _auths) {
               if (err) { return callback(err); }
               if (_auths.length > 1) {
                 // TODO merge multiple users with same browserid into one
