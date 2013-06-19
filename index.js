@@ -10,12 +10,35 @@ browserid.persist('memory');
 
 // .start() convention
 function start(options, callback) {
+  var async = require('async');
+
   // setup .view convention
   var view = resource.use('view');
   view.create({ path: __dirname + '/view' }, function(err, _view) {
       if (err) { return callback(err); }
       browserid.view = _view;
       return callback(null);
+  });
+
+  // setup auth provider
+  async.parallel([
+    // start auth with browserid
+    function(callback) {
+      auth.start({provider: browserid}, callback);
+    },
+    function(callback) {
+      // use auth strategy of provider
+      browserid.strategy(function(err, strategy) {
+        if (err) { return callback(err); }
+        auth.use(strategy, callback);
+      });
+    },
+    // use route of provider
+    function(callback) {
+      browserid.routes({}, callback);
+    }],
+  function(err) {
+    return callback(err);
   });
 }
 browserid.method('start', start, {
@@ -120,7 +143,8 @@ browserid.method('routes', routes, {
 });
 
 browserid.dependencies = {
-  'passport-browserid': '*'
+  'passport-browserid': '*',
+  'async': '*'
 };
 browserid.license = 'MIT';
 exports['auth-browserid'] = browserid;
