@@ -2,6 +2,7 @@ var resource = require('resource'),
     logger = resource.logger,
     http = resource.use('http'),
     auth = resource.use('auth'),
+    user = resource.use('user'),
     browserid = resource.define('auth-browserid');
 
 browserid.schema.description = "for integrating BrowserID authentication";
@@ -63,7 +64,6 @@ function strategy(callback) {
     // asynchronous verification, for effect...
     process.nextTick(function () {
       if (!req.user) {
-        var user = resource.use('user');
         logger.info('user is not logged in, authorizing with browserid');
         browserid.get(email, function(err, _browserid) {
           if (err && (err.message === email + " not found")) {
@@ -72,11 +72,11 @@ function strategy(callback) {
               if (err) { return callback(err); }
               logger.info("new browserid with id", _browserid.id, "created");
               logger.info("since new browserid, creating new user");
-              user.create({browserid: _browserid.id}, function(err, _auth) {
+              user.create({browserid: _browserid.id}, function(err, _user) {
                 if (err) { return callback(err); }
-                logger.info("new user with id", _auth.id, "created");
-                logger.info("new user object", JSON.stringify(_auth));
-                return done(null, _auth);
+                logger.info("new user with id", _user.id, "created");
+                logger.info("new user object", JSON.stringify(_user));
+                return done(null, _user);
               });
             });
           } else if (err) {
@@ -84,18 +84,18 @@ function strategy(callback) {
           } else {
             logger.info("email found, using associated browserid");
             logger.info("browserid objects found", JSON.stringify(browserids));
-            user.find({browserid: _browserid.id}, function(err, _auths) {
+            user.find({browserid: _browserid.id}, function(err, _users) {
               if (err) { return callback(err); }
-              if (_auths.length > 1) {
+              if (_users.length > 1) {
                 // TODO merge multiple users with same browserid into one
-                return done(null, _auth[0]);
+                return done(null, _user[0]);
               }
             });
           }
         });
       } else {
         logger.info('user is logged in, associating browserid with user');
-        var user = req.user;
+        var _user = req.user;
         browserid.get(email, function(err, _browserid) {
           if (err && (err.message === email + " not found")) {
             logger.info("email not found. creating new browserid");
@@ -103,18 +103,18 @@ function strategy(callback) {
               logger.info("new browserid with id", _browserid.id, "created");
               if (err) { return callback(err); }
               // associate new browserid with user
-              user['browserid'] = _browserid.id;
+              _user['browserid'] = _browserid.id;
               // preserve the login state by returning the existing user
-              done(null, user);
+              _user.save(done);
             });
           } else if (err) {
             return callback(err);
           } else {
             logger.info("email found. using existing browserid");
             // associate new browserid with user
-            user['browserid'] = _browserid.id;
+            _user['browserid'] = _browserid.id;
             // preserve the login state by returning the existing user
-            done(null, user);
+            done(null, _user);
           }
         });
       }
