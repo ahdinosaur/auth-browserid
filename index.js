@@ -13,22 +13,25 @@ browserid.persist('memory');
 function start(options, callback) {
   var async = require('async');
 
-  // setup .view convention
-  var view = resource.use('view');
-  view.create({ path: __dirname + '/view' }, function(err, _view) {
-      if (err) { return callback(err); }
-      browserid.view = _view;
-      return callback(null);
-  });
-
+  //
   // setup auth provider
+  //
   async.parallel([
+    // setup .view convention
+    function(callback) {
+      var view = resource.use('view');
+      view.create({ path: __dirname + '/view' }, function(err, _view) {
+          if (err) { return callback(err); }
+          browserid.view = _view;
+          return callback(null);
+      });
+    },
     // start auth with browserid
     function(callback) {
       auth.start({provider: browserid}, callback);
     },
+    // use auth strategy of provider
     function(callback) {
-      // use auth strategy of provider
       browserid.strategy(function(err, strategy) {
         if (err) { return callback(err); }
         auth.use(strategy, callback);
@@ -38,7 +41,7 @@ function start(options, callback) {
     function(callback) {
       browserid.routes({}, callback);
     }],
-  function(err) {
+  function(err, results) {
     return callback(err);
   });
 }
