@@ -54,7 +54,8 @@ browserid.property('id', {
 });
 
 function strategy(callback) {
-  BrowserIDStrategy = require('passport-browserid').Strategy;
+  var BrowserIDStrategy = require('passport-browserid').Strategy,
+      async = require('async');
   // Use the BrowserIDStrategy within Passport.
   //   Strategies in passport require a `validate` function, which accept
   //   credentials (in this case, a BrowserID verified email address), and invoke
@@ -68,56 +69,80 @@ function strategy(callback) {
     process.nextTick(function () {
       if (!req.user) {
         logger.info('user is not logged in, authorizing with browserid');
-        browserid.get(email, function(err, _browserid) {
-          if (err && (err.message === email + " not found")) {
-            logger.info("email not found. creating new browserid");
-            browserid.create({id: email}, function(err, _browserid) {
-              if (err) { return callback(err); }
-              logger.info("new browserid with id", _browserid.id, "created");
-              logger.info("since new browserid, creating new user");
-              user.create({browserid: _browserid.id}, function(err, _user) {
-                if (err) { return callback(err); }
-                logger.info("new user with id", _user.id, "created");
-                logger.info("new user object", JSON.stringify(_user));
-                return done(null, _user);
-              });
-            });
-          } else if (err) {
-            return callback(err);
-          } else {
-            logger.info("email found, using associated browserid");
-            logger.info("browserid objects found", JSON.stringify(browserids));
-            user.find({browserid: _browserid.id}, function(err, _users) {
-              if (err) { return callback(err); }
-              if (_users.length > 1) {
-                // TODO merge multiple users with same browserid into one
-                return done(null, _user[0]);
+        async.waterfall([
+          // get browserid instance
+          function(callback) {
+            browserid.get(email, function(err, _browserid) {
+              if (err && (err.message === email + " not found")) {
+                logger.info("email not found. creating new browserid");
+                browserid.create({
+                  id: email
+                }, function(err, _browserid) {
+                  if (err) { return callback(err); }
+                  logger.info("new browserid with id", _browserid.id, "created");
+                  logger.info("new browserid object", JSON.stringify(_browserid));
+                  return callback(null, _browserid);
+                });
+              } else if (err) {
+                return callback(err);
+              } else {
+                return callback(null, _browserid);
               }
             });
-          }
-        });
+          },
+          // get user instance
+          function(_browserid, callback) {
+            logger.info("finding user with browserid email");
+            user.find({browserid: _browserid.id}, function(err, _users) {
+              if (err) { return callback(err); }
+              else if (_users.length > 1) {
+                logger.info("multiple users with same browserid id found!");
+                // TODO merge multiple users with same browserid into one
+                return callback(null, _user[0]);
+              } else if (_users.length === 0) {
+                logger.info("user not found, creating new user");
+                user.create({browserid: _browserid.id}, function(err, _user) {
+                  if (err) { return callback(err); }
+                  logger.info("new user with id", _user.id, "created");
+                  logger.info("new user object", JSON.stringify(_user));
+                  return callback(null, _user);
+                });
+              } else {
+                logger.info("using existing user", _users[0].id);
+                return callback(null, _users[0]);
+              }
+            });
+          }],
+          // return user as auth
+          function(err, _user) {
+            if (err) { return done(err); }
+            return done(null, _user);
+          });
       } else {
         logger.info('user is logged in, associating browserid with user');
         var _user = req.user;
         browserid.get(email, function(err, _browserid) {
           if (err && (err.message === email + " not found")) {
             logger.info("email not found. creating new browserid");
-            browserid.create({email: email}, function(err, _browserid) {
+            browserid.create({
+              id: email
+            }, function(err, _browserid) {
+              if (err) { return done(err); }
               logger.info("new browserid with id", _browserid.id, "created");
-              if (err) { return callback(err); }
+              logger.info("new browserid object", JSON.stringify(_browserid));
               // associate new browserid with user
               _user['browserid'] = _browserid.id;
               // preserve the login state by returning the existing user
               _user.save(done);
             });
           } else if (err) {
-            return callback(err);
+            return done(err);
           } else {
             logger.info("email found. using existing browserid");
             // associate new browserid with user
             _user['browserid'] = _browserid.id;
             // preserve the login state by returning the existing user
-            done(null, _user);
+            _user.save(done);
           }
         });
       }
@@ -129,17 +154,12 @@ browserid.method('strategy', strategy, {
 });
 
 function routes(options, callback) {
-  var authOrAuthz = function(req, res, next) {
-    if (!req.isAuthenticated()) {
-      auth.authenticate('browserid', {
-        successRedirect: '/',
-        failureRedirect: '/'
-      })(req, res, next);
-    } else {
-      auth.authorize('browserid')(req, res, next);
-    }
-  };
-  http.app.post('/auth/browserid', authOrAuthz);
+  http.app.post('/auth/browserid',
+    auth.authenticate('browserid', { failureRedirect: '/login' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      res.redirect('/');
+    });
   callback(null);
 }
 browserid.method('routes', routes, {
