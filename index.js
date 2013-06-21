@@ -155,7 +155,7 @@ browserid.method('strategy', strategy, {
 
 function routes(options, callback) {
   http.app.post('/auth/browserid',
-    auth.authenticate('browserid', { failureRedirect: '/login' }),
+    auth.authenticate('browserid', { failureRedirect: '/' }),
     function(req, res) {
       // Successful authentication, redirect home.
       res.redirect('/');
