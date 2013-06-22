@@ -60,7 +60,7 @@ function strategy(callback) {
   //   Strategies in passport require a `validate` function, which accept
   //   credentials (in this case, a BrowserID verified email address), and invoke
   //   a callback with a user object.
-  callback(null, new BrowserIDStrategy({
+  return callback(null, new BrowserIDStrategy({
     audience: 'http://localhost:8888',
     passReqToCallback: true
   },
@@ -160,7 +160,7 @@ function routes(options, callback) {
       // Successful authentication, redirect home.
       res.redirect('/');
     });
-  callback(null);
+  return callback(null);
 }
 browserid.method('routes', routes, {
   description: 'sets routes for browserid in app'
