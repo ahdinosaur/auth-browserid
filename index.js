@@ -87,7 +87,7 @@ function strategy(callback) {
         // log browserid object
         function(_browserid, callback) {
           logger.info("browserid object", JSON.stringify(_browserid));
-          callback(null, _browserid);
+          return callback(null, _browserid);
         },
         // associate browserid with user auth
         function(_browserid, callback) {
@@ -128,7 +128,7 @@ function strategy(callback) {
                     return callback(err);
                   } else {
                     logger.info("user id ", _user.id, "found");
-                    callback(null, _user);
+                    return callback(null, _user);
                   }
                 });
               }],
